@@ -4,6 +4,7 @@ import py_anime_list_sync
 
 import click
 from rich.console import Console
+import time
 
 console = Console()
 
@@ -11,10 +12,9 @@ console = Console()
 @click.command()
 def main():
     """Console script for py_anime_list_sync."""
-    console.print(
-        "Replace this message by putting your code into " "py_anime_list_sync.cli.main"
-    )
-    console.print("See Typer documentation at https://typer.tiangolo.com/")
+
+    with console.status("Something great is coming", spinner="earth"):
+        time.sleep(60)
 
 
 if __name__ == "__main__":

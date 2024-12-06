@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "py_alsync"
+name = "alsync"
 version = "0.0.1"
 description = "Sync anime lists between different services."
 readme = "README.rst"
@@ -37,7 +37,7 @@ changelog = "https://github.com/Enoch02/py_anime_list_sync/blob/master/changelog
 homepage = "https://github.com/Enoch02/py_anime_list_sync"
 
 [project.scripts]
-py_alsync = "py_anime_list_sync.cli:main"
+alsync = "py_anime_list_sync.cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
