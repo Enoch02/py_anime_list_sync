@@ -1,21 +1,17 @@
-"""Console script for py_anime_list_sync."""
-
-import py_anime_list_sync
-
 import click
 from rich.console import Console
-import time
+from .commands import dummy_group
+from .utils.console import console
 
-console = Console()
+
+@click.group()
+@click.version_option()
+def cli():
+    """My CLI App description"""
+    pass
 
 
-@click.command()
-def main():
-    """Console script for py_anime_list_sync."""
-
-    with console.status("Something great is coming", spinner="earth"):
-        time.sleep(60)
-
+cli.add_command(dummy_group.commands)
 
 if __name__ == "__main__":
-    main()
+    cli()
