@@ -1,4 +1,3 @@
-# src/my_cli_app/commands/command_group1.py
 import click
 from ..utils.console import console
 import time

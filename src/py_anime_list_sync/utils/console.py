@@ -6,6 +6,8 @@ custom_theme = Theme(
         "info": "cyan",
         "warning": "yellow",
         "error": "red bold",
+        "url": "blue underline",
+        "msg": "bold green"
     }
 )
 

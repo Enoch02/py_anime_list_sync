@@ -108,3 +108,6 @@ ENV/
 .vscode/
 .idea/
 
+# user account files
+mal_token.json
+
