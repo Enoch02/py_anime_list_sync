@@ -1,10 +1,8 @@
 import click
-import requests.exceptions
 
 from ..utils.console import console
 from ..utils.constants import AVAILABLE_TRACKERS
-from ..logic.authentication import authenticate_tracker, get_authenticated_accounts
-from rich.table import Table
+from ..logic.authentication import authenticate_tracker, list_authenticated_accounts
 
 
 @click.group(name="auth")
@@ -44,15 +42,4 @@ def add_tracker(tracker: str):
 @commands.command()
 def whoami():
     """List the currently authenticated accounts"""
-    table = Table(title="Authenticated Accounts")
-    table.add_column("Tracker", justify="center", style="blue")
-    table.add_column("Account Name", justify="center")
-
-    try:
-        with console.status("Loading accounts..", spinner="earth"):
-            for account in get_authenticated_accounts():
-                table.add_row(account.tracker, account.account_name)
-                console.print(table)
-    except requests.exceptions.ConnectionError:
-        console.print("Alsync could not connect to the server 😔", style="error")
-        console.print("Check your internet connection and try again", style="info")
+    list_authenticated_accounts()

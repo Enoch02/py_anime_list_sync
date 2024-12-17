@@ -1,7 +1,6 @@
 import click
-from rich.console import Console
-from .commands import dummy_group, authentication_group
-from .utils.console import console
+
+from .commands import dummy_group, authentication_group, library_group
 
 
 @click.group()
@@ -15,6 +14,8 @@ def cli():
 cli.add_command(dummy_group.commands)
 # noinspection PyTypeChecker
 cli.add_command(authentication_group.commands)
+# noinspection PyTypeChecker
+cli.add_command(library_group.commands)
 
 if __name__ == "__main__":
     cli()

@@ -1,8 +1,5 @@
 import json
 import secrets
-import signal
-
-import sys
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
