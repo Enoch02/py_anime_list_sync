@@ -8,11 +8,13 @@ import requests
 
 from ..utils.console import console
 from ..utils.constants import MAL_CLIENT_ID
+from ..utils.models import AuthenticatedAccount
 
-received_code = None
+received_code: str | None = None
 server_closed = threading.Event()
 
 
+# AUTHENTICATION LOGIC
 def get_new_code_verifier() -> str:
     token = secrets.token_urlsafe(100)
     return token[:128]
@@ -99,7 +101,12 @@ def start_oauth_server():
 
 
 # FIXME: can't ctrl+c to stop server after it starts
+# TODO: more secure method of storing access token
 def add_mal_account():
+    """
+    Starts the process of authenticating a new MAL account and saving
+    its access token locally on the device for future queries
+    """
     code_verifier = code_challenge = get_new_code_verifier()
     print_new_authorization_url(code_challenge)
 
@@ -118,5 +125,35 @@ def add_mal_account():
         return False
 
 
-if __name__ == "__main__":
-    add_mal_account()
+# LIST MANAGEMENT LOGIC
+def mal_get_anime_list(account: AuthenticatedAccount, limit=100) -> dict | None:
+    """
+        Fetch anime data from MyAnimeList API.
+
+        Args:
+            account (AuthenticatedAccount): an authenticated account
+            limit (int): Maximum number of results to return (default: 100)
+
+        Returns:
+            dict: JSON response from the API if successful
+            None: If the request fails
+        """
+
+    url = "https://api.myanimelist.net/v2/users/@me/animelist"
+    headers = {
+        "Authorization": f"Bearer {account.token}"
+    }
+    params = {
+        "status": "watching",
+        "limit": limit
+    }
+
+    try:
+        response = requests.get(url, headers=headers, params=params)
+        response.raise_for_status()  # Raise an exception for bad status codes
+
+        return response.json()
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error making request: {e}")
+        return None

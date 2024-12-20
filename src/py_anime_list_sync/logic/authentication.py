@@ -2,7 +2,7 @@ import json
 import requests.exceptions
 
 from rich.table import Table
-from .mal_authentication import add_mal_account, get_user_info
+from .mal_logic import add_mal_account, get_user_info
 from ..utils.constants import AVAILABLE_TRACKERS
 from ..utils.console import console
 from ..utils.models import AuthenticatedAccount
@@ -20,13 +20,14 @@ def get_authenticated_accounts() -> list[AuthenticatedAccount]:
     authenticated_accounts = []
 
     with open("mal_token.json", "r") as file:
-        token = json.load(file)
-        user_info = get_user_info(token["access_token"])
+        ds_json = json.load(file)
+        user_info = get_user_info(ds_json["access_token"])
         authenticated_accounts.append(
             AuthenticatedAccount(
                 id=1,
                 tracker="MAL",
-                account_name=user_info["name"]
+                account_name=user_info["name"],
+                token=ds_json["access_token"]
             )
         )
 
