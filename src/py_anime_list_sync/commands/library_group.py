@@ -3,7 +3,8 @@ import click
 from ..utils.console import console
 from ..logic.authentication import get_authenticated_accounts, list_authenticated_accounts
 from ..logic.list_management import get_list_for
-from ..utils.models import AuthenticatedAccount, SortOptions, StatusFilters
+from ..utils.models import AuthenticatedAccount
+from ..utils.mal_models import MALSortOptions, MALStatusFilters
 from ..utils.helpers import get_enum_names
 
 
@@ -15,13 +16,18 @@ def commands():
 
 @commands.command("anime")
 @click.argument("account_id", type=int)
-@click.option("-o", "--order",
-              type=click.Choice(get_enum_names(SortOptions), case_sensitive=False),
-              help="Sorts the anime list in the specified method")
-@click.option("-s", "--status",
-              default=StatusFilters.all.name,
-              type=click.Choice(get_enum_names(StatusFilters), case_sensitive=False),
-              help="Filters returned anime list by these.")
+@click.option(
+    "-o", "--order",
+    default=MALSortOptions.title.name,
+    type=click.Choice(get_enum_names(MALSortOptions), case_sensitive=False),
+    help="Sorts the anime list in the specified method"
+)
+@click.option(
+    "-s", "--status",
+    default=MALStatusFilters.all.name,
+    type=click.Choice(get_enum_names(MALStatusFilters), case_sensitive=False),
+    help="Filters anime list."
+)
 @click.option("-l", "--limit", type=int, default=100)
 def anime_list(account_id: int, order: str, status: str, limit: int):
     """View your anime list"""
@@ -43,8 +49,7 @@ def anime_list(account_id: int, order: str, status: str, limit: int):
     else:
         console.print(f"Welcome {selected_account.account_name}!")
         with console.status("Getting anime list..", spinner="clock"):
-            # TODO: implement status and limit
-            get_list_for(selected_account, order)
+            get_list_for(selected_account, order, status, limit)
 
 
 @commands.command("manga")

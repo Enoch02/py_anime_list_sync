@@ -19,4 +19,4 @@ def get_enum_names(enum_class: Type[Enum]) -> list[str]:
 
         names = get_enum_names(Color)  # Returns ['RED', 'BLUE']
     """
-    return [member.name for member in enum_class]
+    return [member.value for member in enum_class]

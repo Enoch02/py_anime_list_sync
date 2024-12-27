@@ -2,13 +2,21 @@ import json
 import secrets
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from typing import Optional, List
 from urllib.parse import urlparse, parse_qs
 
 import requests
+from rich.table import Table
 
+from rich.traceback import install
 from ..utils.console import console
 from ..utils.constants import MAL_CLIENT_ID
+from ..utils.mal_helpers import parse_anime_response
+from ..utils.mal_models import MALAnimeListResponse, MALAnimeData, MALNode, MALPaging, Anime
 from ..utils.models import AuthenticatedAccount
+
+# TODO: remove?
+install(show_locals=True)
 
 received_code: str | None = None
 server_closed = threading.Event()
@@ -126,13 +134,16 @@ def add_mal_account():
 
 
 # LIST MANAGEMENT LOGIC
-def mal_get_anime_list(account: AuthenticatedAccount, limit=100) -> dict | None:
+def mal_get_anime_list(account: AuthenticatedAccount, sort: str, status: str, limit=100) -> Optional[
+    MALAnimeListResponse]:
     """
         Fetch anime data from MyAnimeList API.
 
         Args:
             account (AuthenticatedAccount): an authenticated account
             limit (int): Maximum number of results to return (default: 100)
+            sort: sorting option
+            status: status filter
 
         Returns:
             dict: JSON response from the API if successful
@@ -144,16 +155,78 @@ def mal_get_anime_list(account: AuthenticatedAccount, limit=100) -> dict | None:
         "Authorization": f"Bearer {account.token}"
     }
     params = {
-        "status": "watching",
+        "status": status,
+        "sort": sort,
         "limit": limit
     }
+
+    if status == "all":
+        params["status"] = ""
 
     try:
         response = requests.get(url, headers=headers, params=params)
         response.raise_for_status()  # Raise an exception for bad status codes
+        response_json = response.json()
+        parsed_response = MALAnimeListResponse(
+            data=[
+                MALAnimeData(
+                    node=MALNode(
+                        id=item['node']['id'],
+                        title=item['node']['title']
+                    )
+                ) for item in response_json['data']
+            ],
+            paging=MALPaging(next=response_json['paging'].get('next'))
+        )
 
-        return response.json()
+        return parsed_response
 
     except requests.exceptions.RequestException as e:
         print(f"Error making request: {e}")
         return None
+
+
+def mal_get_anime_list_data(account: AuthenticatedAccount, parsed_list: MALAnimeListResponse) -> Optional[List[Anime]]:
+    """
+        Gather Anime data from the Anime List Nodes
+
+        Args:
+            account: Authenticated account
+            parsed_list: Parsed anime list response
+
+        Returns:
+            Optional[Anime]: list of Anime instances containing parsed data or None
+        """
+    anime_list_with_data = []
+
+    for anime_data in parsed_list.data:
+        url = f'https://api.myanimelist.net/v2/anime/{anime_data.node.id}'
+        params = {
+            'fields': 'id,title,main_picture,alternative_titles,start_date,end_date,synopsis,mean,rank,popularity,num_list_users,num_scoring_users,nsfw,created_at,updated_at,media_type,status,genres,my_list_status,num_episodes,start_season,broadcast,source,average_episode_duration,rating,pictures,background,related_anime,related_manga,recommendations,studios,statistics'
+        }
+        headers = {
+            'Authorization': f"Bearer {account.token}"
+        }
+
+        try:
+            response = requests.get(url, headers=headers, params=params)
+            response.raise_for_status()
+
+            if response.status_code == 200:
+                mal_anime = parse_anime_response(response.json())
+                anime_list_with_data.append(mal_anime)
+        except requests.exceptions.RequestException as e:
+            console.print(f"Error making request: {e}", style="error")
+            return None
+
+    return anime_list_with_data
+
+
+# TODO
+def print_mal_table(anime_list: List[Anime]):
+    """
+
+    """
+    table = Table(title="Authenticated Accounts")
+
+    console.print(table)
