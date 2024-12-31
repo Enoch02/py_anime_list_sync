@@ -18,18 +18,19 @@ def commands():
 @click.argument("account_id", type=int)
 @click.option(
     "-o", "--order",
-    default=MALSortOptions.title.name,
+    default=MALSortOptions.title.value,
     type=click.Choice(get_enum_names(MALSortOptions), case_sensitive=False),
     help="Sorts the anime list in the specified method"
 )
 @click.option(
     "-s", "--status",
-    default=MALStatusFilters.all.name,
+    default=MALStatusFilters.all.value,
     type=click.Choice(get_enum_names(MALStatusFilters), case_sensitive=False),
     help="Filters anime list."
 )
 @click.option("-l", "--limit", type=int, default=100)
-def anime_list(account_id: int, order: str, status: str, limit: int):
+@click.option("--verbose/--no-verbose", default=False)
+def anime_list(account_id: int, order: str, status: str, limit: int, verbose: bool):
     """View your anime list"""
     _id = account_id
     selected_account: AuthenticatedAccount | None
@@ -49,7 +50,7 @@ def anime_list(account_id: int, order: str, status: str, limit: int):
     else:
         console.print(f"Welcome {selected_account.account_name}!")
         with console.status("Getting anime list..", spinner="clock"):
-            get_list_for(selected_account, order, status, limit)
+            get_list_for(selected_account, order, status, limit, verbose)
 
 
 @commands.command("manga")

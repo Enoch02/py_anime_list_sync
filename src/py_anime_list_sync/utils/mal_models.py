@@ -64,12 +64,13 @@ class MyListStatus:
     is_rewatching: bool
     updated_at: datetime
     start_date: str = ""
+    finish_date: str = ""
 
 
 @dataclass
 class Season:
-    year: int
-    season: str
+    year: Optional[int]
+    season: Optional[str]
 
 
 @dataclass

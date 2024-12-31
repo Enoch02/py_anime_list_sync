@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 import json
 import secrets
 import threading
@@ -12,11 +13,18 @@ from rich.traceback import install
 from ..utils.console import console
 from ..utils.constants import MAL_CLIENT_ID
 from ..utils.mal_helpers import parse_anime_response
-from ..utils.mal_models import MALAnimeListResponse, MALAnimeData, MALNode, MALPaging, Anime
+from ..utils.mal_models import (
+    MALAnimeListResponse,
+    MALAnimeData,
+    MALNode,
+    MALPaging,
+    Anime,
+)
 from ..utils.models import AuthenticatedAccount
 
 # TODO: remove?
-install(show_locals=True)
+# install(show_locals=True)
+install()
 
 received_code: str | None = None
 server_closed = threading.Event()
@@ -74,23 +82,25 @@ class OAuthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         global received_code
 
-        if self.path.startswith('/oauth'):
+        if self.path.startswith("/oauth"):
             query_components = parse_qs(urlparse(self.path).query)
 
-            if 'code' in query_components:
-                received_code = query_components['code'][0]
+            if "code" in query_components:
+                received_code = query_components["code"][0]
 
                 self.send_response(200)
-                self.send_header('Content-type', 'text/html')
+                self.send_header("Content-type", "text/html")
                 self.end_headers()
-                self.wfile.write(b'Authorization successful! You can close this window.')
+                self.wfile.write(
+                    b"Authorization successful! You can close this window."
+                )
 
                 # Signal that we received the code
                 server_closed.set()
             else:
                 self.send_response(400)
                 self.end_headers()
-                self.wfile.write(b'No authorization code found')
+                self.wfile.write(b"No authorization code found")
         else:
             self.send_response(404)
             self.end_headers()
@@ -101,7 +111,7 @@ class OAuthHandler(BaseHTTPRequestHandler):
 
 
 def start_oauth_server():
-    server = HTTPServer(('localhost', 80), OAuthHandler)
+    server = HTTPServer(("localhost", 8080), OAuthHandler)
     server_thread = threading.Thread(target=server.serve_forever)
     server_thread.daemon = True
     server_thread.start()
@@ -134,31 +144,26 @@ def add_mal_account():
 
 
 # LIST MANAGEMENT LOGIC
-def mal_get_anime_list(account: AuthenticatedAccount, sort: str, status: str, limit=100) -> Optional[
-    MALAnimeListResponse]:
+def mal_get_anime_list(
+    account: AuthenticatedAccount, sort: str, status: str, limit=100
+) -> Optional[MALAnimeListResponse]:
     """
-        Fetch anime data from MyAnimeList API.
+    Fetch anime data from MyAnimeList API.
 
-        Args:
-            account (AuthenticatedAccount): an authenticated account
-            limit (int): Maximum number of results to return (default: 100)
-            sort: sorting option
-            status: status filter
+    Args:
+        account (AuthenticatedAccount): an authenticated account
+        limit (int): Maximum number of results to return (default: 100)
+        sort: sorting option
+        status: status filter
 
-        Returns:
-            dict: JSON response from the API if successful
-            None: If the request fails
-        """
+    Returns:
+        dict: JSON response from the API if successful
+        None: If the request fails
+    """
 
     url = "https://api.myanimelist.net/v2/users/@me/animelist"
-    headers = {
-        "Authorization": f"Bearer {account.token}"
-    }
-    params = {
-        "status": status,
-        "sort": sort,
-        "limit": limit
-    }
+    headers = {"Authorization": f"Bearer {account.token}"}
+    params = {"status": status, "sort": sort, "limit": limit}
 
     if status == "all":
         params["status"] = ""
@@ -170,13 +175,11 @@ def mal_get_anime_list(account: AuthenticatedAccount, sort: str, status: str, li
         parsed_response = MALAnimeListResponse(
             data=[
                 MALAnimeData(
-                    node=MALNode(
-                        id=item['node']['id'],
-                        title=item['node']['title']
-                    )
-                ) for item in response_json['data']
+                    node=MALNode(id=item["node"]["id"], title=item["node"]["title"])
+                )
+                for item in response_json["data"]
             ],
-            paging=MALPaging(next=response_json['paging'].get('next'))
+            paging=MALPaging(next=response_json["paging"].get("next")),
         )
 
         return parsed_response
@@ -186,47 +189,73 @@ def mal_get_anime_list(account: AuthenticatedAccount, sort: str, status: str, li
         return None
 
 
-def mal_get_anime_list_data(account: AuthenticatedAccount, parsed_list: MALAnimeListResponse) -> Optional[List[Anime]]:
+def fetch_anime_data(anime_data, account, verbose):
+    url = f"https://api.myanimelist.net/v2/anime/{anime_data.node.id}"
+    params = {
+        "fields": "id,title,main_picture,alternative_titles,start_date,end_date,synopsis,mean,rank,popularity,num_list_users,num_scoring_users,nsfw,created_at,updated_at,media_type,status,genres,my_list_status,num_episodes,start_season,broadcast,source,average_episode_duration,rating,pictures,background,related_anime,related_manga,recommendations,studios,statistics"
+    }
+    headers = {"Authorization": f"Bearer {account.token}"}
+
+    try:
+        response = requests.get(url, headers=headers, params=params)
+        response.raise_for_status()
+        if response.status_code == 200:
+            if verbose:
+                console.print(f"Loading data for {anime_data.node.title}", style="info")
+            return parse_anime_response(response.json())
+    except requests.exceptions.RequestException:
+        return None
+
+
+def mal_get_anime_list_data(
+    account: AuthenticatedAccount, parsed_list: MALAnimeListResponse, verbose: bool
+) -> Optional[List[Anime]]:
     """
-        Gather Anime data from the Anime List Nodes
+    Gather Anime data from the Anime List Nodes using thread pool
 
-        Args:
-            account: Authenticated account
-            parsed_list: Parsed anime list response
+    Args:
+        account: Authenticated account
+        parsed_list: Parsed anime list response
+        verbose: Enable verbose output
 
-        Returns:
-            Optional[Anime]: list of Anime instances containing parsed data or None
-        """
+    Returns:
+        Optional[List[Anime]]: list of Anime instances containing parsed data or None
+    """
+    max_workers = min(32, len(parsed_list.data))  # Cap at 32 threads
     anime_list_with_data = []
 
-    for anime_data in parsed_list.data:
-        url = f'https://api.myanimelist.net/v2/anime/{anime_data.node.id}'
-        params = {
-            'fields': 'id,title,main_picture,alternative_titles,start_date,end_date,synopsis,mean,rank,popularity,num_list_users,num_scoring_users,nsfw,created_at,updated_at,media_type,status,genres,my_list_status,num_episodes,start_season,broadcast,source,average_episode_duration,rating,pictures,background,related_anime,related_manga,recommendations,studios,statistics'
-        }
-        headers = {
-            'Authorization': f"Bearer {account.token}"
-        }
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [
+            executor.submit(fetch_anime_data, anime_data, account, verbose)
+            for anime_data in parsed_list.data
+        ]
 
-        try:
-            response = requests.get(url, headers=headers, params=params)
-            response.raise_for_status()
+        for future in futures:
+            result = future.result()
+            if result is not None:
+                anime_list_with_data.append(result)
 
-            if response.status_code == 200:
-                mal_anime = parse_anime_response(response.json())
-                anime_list_with_data.append(mal_anime)
-        except requests.exceptions.RequestException as e:
-            console.print(f"Error making request: {e}", style="error")
-            return None
-
-    return anime_list_with_data
+    return anime_list_with_data if anime_list_with_data else None
 
 
 # TODO
-def print_mal_table(anime_list: List[Anime]):
-    """
+def print_mal_table(acc_name: str, anime_list: List[Anime]):
+    """ """
+    table = Table(title=f"{acc_name}'s Anime List")
 
-    """
-    table = Table(title="Authenticated Accounts")
+    table.add_column("ID", justify="right")
+    table.add_column("Title")
+    table.add_column("Episodes", justify="right")
+    table.add_column("Episodes Watched", justify="right")
+    table.add_column("Status")
+
+    for anime in anime_list:
+        table.add_row(
+            str(anime.id),
+            anime.title,
+            str(anime.num_episodes),
+            str(anime.my_list_status.num_episodes_watched),
+            anime.my_list_status.status,
+        )
 
     console.print(table)
