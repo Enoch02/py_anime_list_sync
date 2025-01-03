@@ -1,4 +1,5 @@
 import json
+import os
 import requests.exceptions
 
 from rich.table import Table
@@ -27,7 +28,7 @@ def get_authenticated_accounts() -> list[AuthenticatedAccount]:
                 id=1,
                 tracker="MAL",
                 account_name=user_info["name"],
-                token=ds_json["access_token"]
+                token=ds_json["access_token"],
             )
         )
 
@@ -48,3 +49,21 @@ def list_authenticated_accounts() -> None:
     except requests.exceptions.ConnectionError:
         console.print("Alsync could not connect to the server 😔", style="error")
         console.print("Check your internet connection and try again", style="info")
+
+
+def remove_authenticated_account(id: int) -> bool:
+    with console.status("Removing account..", spinner="dots"):
+        try:
+            authenticated_accounts = get_authenticated_accounts()
+            acc_to_del = list(filter(lambda acc: acc.id == id, authenticated_accounts))
+
+            if acc_to_del[0].tracker == "MAL":
+                os.remove("mal_token.json")
+            return True
+        except FileNotFoundError:
+            return False
+        except PermissionError:
+            return False
+        except Exception as e:
+            console.print(f"An error occurred: {e}", style="error")
+            return False

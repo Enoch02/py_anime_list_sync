@@ -39,7 +39,7 @@ def get_new_code_verifier() -> str:
 # 2. Print the URL needed to authorize your application.
 def print_new_authorization_url(code_challenge: str):
     url = f"https://myanimelist.net/v1/oauth2/authorize?response_type=code&client_id={MAL_CLIENT_ID}&code_challenge={code_challenge}"
-    console.print("Authorise your application by clicking here:")
+    console.print("Authorize the application opening this url in your browser:")
     console.print(f"{url}\n", style="url")
 
 
