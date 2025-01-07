@@ -1,7 +1,10 @@
 import click
 
 from ..utils.console import console
-from ..logic.authentication import get_authenticated_accounts, list_authenticated_accounts
+from ..logic.authentication import (
+    get_authenticated_accounts,
+    list_authenticated_accounts,
+)
 from ..logic.list_management import get_list_for
 from ..utils.models import AuthenticatedAccount
 from ..utils.mal_models import MALSortOptions, MALStatusFilters
@@ -17,16 +20,18 @@ def commands():
 @commands.command("anime")
 @click.argument("account_id", type=int)
 @click.option(
-    "-o", "--order",
+    "-o",
+    "--order",
     default=MALSortOptions.title.value,
     type=click.Choice(get_enum_names(MALSortOptions), case_sensitive=False),
-    help="Sorts the anime list in the specified method"
+    help="Sorts the anime list in the specified method",
 )
 @click.option(
-    "-s", "--status",
+    "-s",
+    "--status",
     default=MALStatusFilters.all.value,
     type=click.Choice(get_enum_names(MALStatusFilters), case_sensitive=False),
-    help="Filters anime list."
+    help="Filters anime list.",
 )
 @click.option("-l", "--limit", type=int, default=100)
 @click.option("--verbose/--no-verbose", default=False)
@@ -40,6 +45,9 @@ def anime_list(account_id: int, order: str, status: str, limit: int, verbose: bo
 
     with console.status("Loading..", spinner="runner"):
         authenticated_accounts = get_authenticated_accounts()
+        if authenticated_accounts is None:
+            console.print("No authenticated account could be loaded", style="error")
+            return
         selected_account = next(filter(account_filter, authenticated_accounts), None)
 
     while not selected_account:
@@ -49,8 +57,7 @@ def anime_list(account_id: int, order: str, status: str, limit: int, verbose: bo
         selected_account = next(filter(account_filter, authenticated_accounts), None)
     else:
         console.print(f"Welcome {selected_account.account_name}!")
-        with console.status("Getting anime list..", spinner="clock"):
-            get_list_for(selected_account, order, status, limit, verbose)
+        get_list_for(selected_account, order, status, limit, verbose)
 
 
 @commands.command("manga")

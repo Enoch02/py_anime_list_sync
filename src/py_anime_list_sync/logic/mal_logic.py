@@ -6,6 +6,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from typing import Optional, List
 from urllib.parse import urlparse, parse_qs
 
+import click
 import requests
 from rich.table import Table
 
@@ -46,6 +47,7 @@ def print_new_authorization_url(code_challenge: str):
 # 3. Once you've authorized your application, you will be redirected to the webpage you've
 #    specified in the API panel. The URL will contain a parameter named "code" (the Authorization
 #    Code). You need to feed that code to the application.
+#TODO: handle the potential exception
 def generate_new_token(authorization_code: str, code_verifier: str) -> dict:
     url = "https://myanimelist.net/v1/oauth2/token"
     data = {
@@ -72,10 +74,16 @@ def get_user_info(access_token: str):
     url = "https://api.myanimelist.net/v2/users/@me"
     response = requests.get(url, headers={"Authorization": f"Bearer {access_token}"})
 
-    response.raise_for_status()
-    user = response.json()
-    response.close()
-    return user
+    try:
+        response.raise_for_status()
+        user = response.json()
+        response.close()
+
+        return user
+
+    except Exception as e:
+        print(f"Error fetching user info: {e}")
+        return None
 
 
 class OAuthHandler(BaseHTTPRequestHandler):
@@ -189,6 +197,32 @@ def mal_get_anime_list(
         return None
 
 
+def get_next_page(
+    account: AuthenticatedAccount, url: str
+) -> Optional[MALAnimeListResponse]:
+    headers = {"Authorization": f"Bearer {account.token}"}
+
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()  # Raise an exception for bad status codes
+        response_json = response.json()
+        parsed_response = MALAnimeListResponse(
+            data=[
+                MALAnimeData(
+                    node=MALNode(id=item["node"]["id"], title=item["node"]["title"])
+                )
+                for item in response_json["data"]
+            ],
+            paging=MALPaging(next=response_json["paging"].get("next")),
+        )
+
+        return parsed_response
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error making request: {e}")
+        return None
+
+
 def fetch_anime_data(anime_data, account, verbose):
     url = f"https://api.myanimelist.net/v2/anime/{anime_data.node.id}"
     params = {
@@ -238,10 +272,12 @@ def mal_get_anime_list_data(
     return anime_list_with_data if anime_list_with_data else None
 
 
-# TODO
-def print_mal_table(acc_name: str, anime_list: List[Anime]):
+# TODO: docstring
+def print_mal_table(acc_name: str, anime_list: List[Anime], page: int):
     """ """
-    table = Table(title=f"{acc_name}'s Anime List")
+    table = Table(
+        title=f"{acc_name}'s Anime List [blue italic][Page {page}][/blue italic]"
+    )
 
     table.add_column("ID", justify="right")
     table.add_column("Title")
@@ -259,3 +295,70 @@ def print_mal_table(acc_name: str, anime_list: List[Anime]):
         )
 
     console.print(table)
+
+
+def get_mal_list(
+    account: AuthenticatedAccount, sort: str, status: str, limit: int, verbose: bool
+):
+    stop = False
+    pages = {}
+    current_page = 1
+    anime_list = mal_get_anime_list(account, sort, status, limit)
+
+    if anime_list is None:
+        console.print("Error fetching anime list", style="error")
+        return
+
+    while not stop:
+        if current_page == 1:
+            with console.status("Getting anime list..", spinner="clock"):
+                anime_list_with_data = mal_get_anime_list_data(
+                    account, anime_list, verbose
+                )
+
+                if anime_list_with_data is None:
+                    console.print("Error fetching anime data", style="error")
+                    return
+
+                print_mal_table(
+                    account.account_name, anime_list_with_data, current_page
+                )
+                pages[current_page] = anime_list_with_data
+                current_page += 1
+
+        choice = click.prompt(
+            "Enter 'n' to view next page,'p' for previous page (q to quit)",
+            prompt_suffix=" ",
+            type=str,
+        )
+
+        if choice.lower() == "q":
+            stop = True
+
+        elif choice.lower() == "n":
+            if anime_list.paging.next is None:
+                console.print("No more pages to show", style="warning")
+                #stop = True
+
+            else:
+                with console.status("Getting anime list..", spinner="clock"):
+                    anime_list = get_next_page(account, anime_list.paging.next)
+                    anime_list_with_data = mal_get_anime_list_data(
+                        account, anime_list, verbose
+                    )
+                    print_mal_table(
+                        account.account_name, anime_list_with_data, current_page
+                    )
+                    pages[current_page] = anime_list_with_data
+                    current_page += 1
+
+        elif choice.lower() == "p":
+            # TODO: handle when anime_list is None & current_page is 0
+            with console.status("Getting anime list..", spinner="clock"):
+                current_page -= 1
+                print_mal_table(
+                    account.account_name, pages.get(current_page), current_page
+                )
+
+        else:
+            console.print("Invalid input", style="warning")

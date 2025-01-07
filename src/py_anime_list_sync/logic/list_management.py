@@ -1,6 +1,7 @@
+import click
 from rich.table import Table
 
-from .mal_logic import print_mal_table
+from .mal_logic import get_mal_list
 from ..logic.mal_logic import mal_get_anime_list, mal_get_anime_list_data
 from ..utils.models import AuthenticatedAccount
 from ..utils.console import console
@@ -23,10 +24,7 @@ def get_list_for(
 
     """
     if account.tracker == AVAILABLE_TRACKERS[0]:
-        # TODO: how do i handle paging?
-        anime_list = mal_get_anime_list(account, sort, status, limit)
-        anime_list_with_data = mal_get_anime_list_data(account, anime_list, verbose)
-        print_mal_table(account.account_name, anime_list_with_data)
+        get_mal_list(account, sort, status, limit, verbose)
 
     elif account.tracker == AVAILABLE_TRACKERS[1]:
         console.print("Coming soon!")

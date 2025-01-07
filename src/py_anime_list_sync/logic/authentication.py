@@ -1,5 +1,6 @@
 import json
 import os
+from typing import Optional
 import requests.exceptions
 
 from rich.table import Table
@@ -17,12 +18,16 @@ def authenticate_tracker(tracker: str) -> bool:
         return False
 
 
-def get_authenticated_accounts() -> list[AuthenticatedAccount]:
+def get_authenticated_accounts() -> Optional[list[AuthenticatedAccount]]:
     authenticated_accounts = []
 
     with open("mal_token.json", "r") as file:
         ds_json = json.load(file)
         user_info = get_user_info(ds_json["access_token"])
+
+        if user_info is None:
+            return None
+
         authenticated_accounts.append(
             AuthenticatedAccount(
                 id=1,
