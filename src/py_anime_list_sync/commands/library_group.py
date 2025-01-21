@@ -18,7 +18,7 @@ def commands():
 
 
 @commands.command("anime")
-@click.argument("account_id", type=int)
+@click.argument("account_id", type=int, required=False)
 @click.option(
     "-o",
     "--order",
@@ -39,6 +39,10 @@ def anime_list(account_id: int, order: str, status: str, limit: int, verbose: bo
     """View your anime list"""
     _id = account_id
     selected_account: AuthenticatedAccount | None
+
+    if not account_id:
+        list_authenticated_accounts()
+        _id = click.prompt("Select an account id", type=int)
 
     def account_filter(account: AuthenticatedAccount) -> bool:
         return account.id == _id
